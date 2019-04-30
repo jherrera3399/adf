@@ -1,19 +1,23 @@
 package com.adf.util;
 
+import java.math.BigDecimal;
+import java.math.BigInteger;
+
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.stereotype.Component;
+
+@Component
+@Qualifier("coinExchangeWrapper")
 public class CoinExchangeWrapper {
 
-	private Double total;
+	private BigDecimal total = new BigDecimal(BigInteger.ZERO,2);
 	private Integer currentCoinQuantity;
 	private Integer maxCoinQuantity;
-	private Double currentCoinDenomination;
+	private BigDecimal currentCoinDenomination = new BigDecimal(BigInteger.ZERO,2);
 	
+	public CoinExchangeWrapper() {
+	}
 	
-	public Double getTotal() {
-		return total;
-	}
-	public void setTotal(Double total) {
-		this.total = total;
-	}
 	public Integer getCurrentCoinQuantity() {
 		return currentCoinQuantity;
 	}
@@ -26,12 +30,23 @@ public class CoinExchangeWrapper {
 	public void setMaxCoinQuantity(Integer maxCoinQuantity) {
 		this.maxCoinQuantity = maxCoinQuantity;
 	}
-	public Double getCurrentCoinDenomination() {
+
+	public BigDecimal getTotal() {
+		return total;
+	}
+
+	public void setTotal(BigDecimal total) {
+		this.total = total;
+	}
+
+	public BigDecimal getCurrentCoinDenomination() {
 		return currentCoinDenomination;
 	}
-	public void setCurrentCoinDenomination(Double currentCoinDenomination) {
+
+	public void setCurrentCoinDenomination(BigDecimal currentCoinDenomination) {
 		this.currentCoinDenomination = currentCoinDenomination;
 	}
+
 	
 	
 	

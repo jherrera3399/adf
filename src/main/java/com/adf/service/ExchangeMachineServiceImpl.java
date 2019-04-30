@@ -1,187 +1,146 @@
 package com.adf.service;
 
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.math.MathContext;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.logging.Level;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import com.adf.exception.ExchangeMachineException;
 import com.adf.model.BillToExchange;
+import com.adf.model.CoinsDTO;
 import com.adf.response.CoinsResponse;
 import com.adf.util.CoinExchangeWrapper;
-import com.adf.util.ExchangeMachineValues;
+import com.adf.util.CoinsDispenser;
 
 @Service
 @Qualifier("exchangeMachineService")
 public class ExchangeMachineServiceImpl implements ExchangeMachineService {
-
 	
 	@Autowired
-	private ExchangeMachineValues exchangeMachineValues;
+	private CoinExchangeWrapper coinExchangeWrapper;
 	
 	
+	@Autowired
+	private CoinsDispenser coinsDispenser;
 	
+	MathContext mc = new MathContext(2);
+	
+	
+	private void getCoinsCalculation(CoinExchangeWrapper coinExchangeWrapper, List<CoinsResponse> lstCoinsResponse) {
+		
+		BigDecimal requieredCoins = new BigDecimal(BigInteger.ZERO,2);
+		BigDecimal dCoinsAmount = new BigDecimal(BigInteger.ZERO,2);
+		BigDecimal tempTotal = new BigDecimal(BigInteger.ZERO,2);
+		BigDecimal newTotal = new BigDecimal(BigInteger.ZERO,2);
+		BigDecimal currentDenomination = new BigDecimal(BigInteger.ZERO,2);
+		Integer iMaxCoinsQuantity = 0;
+		
+		currentDenomination = coinExchangeWrapper.getCurrentCoinDenomination().setScale(2, RoundingMode.FLOOR);
+		tempTotal = coinExchangeWrapper.getTotal().setScale(2, RoundingMode.CEILING);
+		
+		requieredCoins = tempTotal.divide(currentDenomination,2,RoundingMode.FLOOR);
+		
+		if(requieredCoins.intValue() > coinExchangeWrapper.getCurrentCoinQuantity()) {
+			iMaxCoinsQuantity = coinExchangeWrapper.getCurrentCoinQuantity();
+		}else if(requieredCoins.intValue() <= coinExchangeWrapper.getCurrentCoinQuantity()) {
+			iMaxCoinsQuantity = requieredCoins.intValue();
+		}else {
+			iMaxCoinsQuantity = coinExchangeWrapper.getMaxCoinQuantity();
+		}
+		
+		dCoinsAmount = currentDenomination.multiply(new BigDecimal(iMaxCoinsQuantity).setScale(2, RoundingMode.FLOOR));
+		newTotal = tempTotal.subtract(dCoinsAmount, mc);
+		coinExchangeWrapper.setTotal(newTotal);
+		if(dCoinsAmount.doubleValue() > 0.0) {
+			CoinsResponse coinsResponse = new CoinsResponse();
+			coinsResponse.setCoinQuantity(iMaxCoinsQuantity);
+			coinsResponse.setCoinDenomination(coinExchangeWrapper.getCurrentCoinDenomination().doubleValue());
+			coinsResponse.setCoinAmount(dCoinsAmount.doubleValue());
+			lstCoinsResponse.add(coinsResponse);
+			coinExchangeWrapper.setCurrentCoinQuantity(coinExchangeWrapper.getCurrentCoinQuantity() -iMaxCoinsQuantity);
+		
+		}
+		
+	}
+
+
+
 	@Override
-	public List<CoinsResponse> billsToCoinst(List<BillToExchange> lstBillToExchange) throws Exception {
+	public List<CoinsResponse> billsToCoinstRef(List<BillToExchange> lstBillToExchange) throws ExchangeMachineException {
 		// TODO Auto-generated method stub
-	
+		
 		Double dTotal = 0.0;
-		Double dQuaterCoinsAmount = 0.0;
-		Integer iMaxQuarterAmount = 0;
-		Double dDimeCointsAmount = 0.0;
-		Integer iMaxDimeAmount = 0;
-		Integer iMaxFiveQuantity = 0;
-		Double dFiveCoinsAmount = 0.0;
-		Integer iMaxOneQuantity = 0;
-		Double dOneCoinsAmount = 0.0;
-		
 		List<CoinsResponse> lstCoinsResponse = new ArrayList<CoinsResponse>();
-		
-		CoinExchangeWrapper coinExchangeWrapper = new CoinExchangeWrapper();
-		
-//		coinExchangeWrapper.setTotal(0.0);
+		String erroMessage = null;
 		
 		for(BillToExchange billToExchange : lstBillToExchange) {
 			dTotal = dTotal + (billToExchange.getBillQuantity() * billToExchange.getBillAmount().doubleValue());
 		}
 		
-		coinExchangeWrapper.setTotal(dTotal);
-		System.out.println("Amount to Exchange : " + dTotal );
-		if(exchangeMachineValues.twentyfiveCentsQuatity > exchangeMachineValues.twentyfiveCentsMaxQuatity ) {
-			iMaxQuarterAmount = exchangeMachineValues.twentyfiveCentsMaxQuatity;
-		}else {
-			iMaxQuarterAmount = exchangeMachineValues.twentyfiveCentsQuatity;
-		}
+		try {
 		
-		dQuaterCoinsAmount = exchangeMachineValues.twentyfiveCentsAmount * iMaxQuarterAmount;
-		dTotal = dTotal - dQuaterCoinsAmount;
-		coinExchangeWrapper.setTotal(coinExchangeWrapper.getTotal() - dQuaterCoinsAmount);
-		if(dQuaterCoinsAmount > 0.0) {
-			CoinsResponse quaterResponse = new CoinsResponse();
-			quaterResponse.setCoinQuantity(iMaxQuarterAmount);
-			quaterResponse.setCoinDenomination(exchangeMachineValues.twentyfiveCentsAmount);
-			quaterResponse.setCoinAmount(dQuaterCoinsAmount);
-			lstCoinsResponse.add(quaterResponse);
-			exchangeMachineValues.twentyfiveCentsQuatity = exchangeMachineValues.twentyfiveCentsQuatity - iMaxQuarterAmount;  
-		}
-		
-		
-		System.out.println("--------------");
-		System.out.println("Quaters Amount : " + dQuaterCoinsAmount);
-		System.out.println("Amount after substraction : " + dTotal);
-		System.out.println("Remaining coins in machine : " + exchangeMachineValues.twentyfiveCentsQuatity);
-		System.out.println("Wrapper Amount after Substraction coins in machine : " + coinExchangeWrapper.getTotal());
+			//Iterate over coins denomination for calculation
+			coinExchangeWrapper.setTotal(new BigDecimal(dTotal).setScale(2, RoundingMode.FLOOR));
+			for(CoinsDTO coins : coinsDispenser.getCoinsDispenser() ) {
+			
+				System.out.println("Coin id : " + coins.getId() + " Denomination : " + coins.getCoinDenomination() + " Quantity : " + coins.getCoinQuantity());
+				
+				if(coins.getCoinQuantity() > 0) {
+					coinExchangeWrapper.setCurrentCoinDenomination(coins.getCoinDenomination());
+					coinExchangeWrapper.setCurrentCoinQuantity(coins.getCoinQuantity());
+					coinExchangeWrapper.setMaxCoinQuantity(coins.getCoinMaxQuantity());
+					getCoinsCalculation(coinExchangeWrapper, lstCoinsResponse);
+					coins.setCoinQuantity(coinExchangeWrapper.getCurrentCoinQuantity());
+				}
+				
+				System.out.println("Total Remain for Calculation : " + coinExchangeWrapper.getTotal());
+				
+				if(coinExchangeWrapper.getTotal().compareTo(BigDecimal.ZERO) == 0) {
+					break;
+				}
+			}
 
-		//Dime Calculations 
-		if(exchangeMachineValues.dimeCentsQuantity > exchangeMachineValues.dimeCentsMaxQuantity ) {
-			iMaxDimeAmount = exchangeMachineValues.dimeCentsMaxQuantity;
-		}else {
-			iMaxDimeAmount = exchangeMachineValues.dimeCentsQuantity;
+			//Amount still not completed, needs to raise error
+			if(coinExchangeWrapper.getTotal().compareTo(BigDecimal.ZERO) != 0) {
+				//Raise exception
+				erroMessage = "Not Enough coins to complete exchange";
+				throw new Exception();
+			}
+		
+		}catch(Exception e) {
+			if(erroMessage != null) {
+				throw getExchangeMachineException(erroMessage, e);
+			}else {
+				throw getExchangeMachineException(e.getMessage(), e);
+			}
 		}
-		
-		dDimeCointsAmount = exchangeMachineValues.dimeCentsAmount * iMaxQuarterAmount;
-		dTotal = dTotal - dDimeCointsAmount;
-		coinExchangeWrapper.setTotal(coinExchangeWrapper.getTotal() - dDimeCointsAmount);
-		if(dDimeCointsAmount > 0.0) {
-			CoinsResponse coinsResponse = new CoinsResponse();
-			coinsResponse.setCoinQuantity(iMaxQuarterAmount);
-			coinsResponse.setCoinDenomination(exchangeMachineValues.dimeCentsAmount);
-			coinsResponse.setCoinAmount(dDimeCointsAmount);
-			lstCoinsResponse.add(coinsResponse);
-			exchangeMachineValues.dimeCentsQuantity = exchangeMachineValues.dimeCentsQuantity - iMaxQuarterAmount;  
-		}
-
-		
-		System.out.println("Dime Calculations --------------");
-		System.out.println("Dime Amount : " + dDimeCointsAmount);
-		System.out.println("Amount after substraction : " + dTotal);
-		System.out.println("Remaining coins in machine : " + exchangeMachineValues.dimeCentsQuantity );
-		System.out.println("Wrapper Amount after Substraction coins in machine : " + coinExchangeWrapper.getTotal());
-
-		
-		//Five Cents Calculation
-		
-		if(exchangeMachineValues.fiveCentsQuantity > exchangeMachineValues.fiveCentsMaxQuantity ) {
-			iMaxFiveQuantity = exchangeMachineValues.fiveCentsMaxQuantity;
-		}else {
-			iMaxFiveQuantity = exchangeMachineValues.fiveCentsQuantity;
-		}
-		
-		dFiveCoinsAmount = exchangeMachineValues.fiveCentsAmount * iMaxFiveQuantity;
-		dTotal = dTotal - dFiveCoinsAmount;
-		if(dFiveCoinsAmount > 0.0) {
-			CoinsResponse coinsResponse = new CoinsResponse();
-			coinsResponse.setCoinQuantity(iMaxFiveQuantity);
-			coinsResponse.setCoinDenomination(exchangeMachineValues.fiveCentsAmount);
-			coinsResponse.setCoinAmount(dFiveCoinsAmount);
-			lstCoinsResponse.add(coinsResponse);
-			exchangeMachineValues.fiveCentsQuantity = exchangeMachineValues.fiveCentsQuantity - iMaxFiveQuantity;  
-		}
-
-		
-		System.out.println("Five Cents Calculations --------------");
-		System.out.println("Five Cents Amount : " + dFiveCoinsAmount);
-		System.out.println("Amount after substraction : " + dTotal);
-		System.out.println("Remaining coins in machine : " + exchangeMachineValues.fiveCentsQuantity );
-
-		
-		//One Cent Calculation
-		
-		if(exchangeMachineValues.oneCentQuantity > exchangeMachineValues.oneCentMaxQuantity ) {
-			iMaxOneQuantity = exchangeMachineValues.oneCentMaxQuantity;
-		}else {
-			iMaxOneQuantity = exchangeMachineValues.oneCentQuantity;
-		}
-		
-		dOneCoinsAmount = exchangeMachineValues.oneCentAmout * iMaxOneQuantity;
-		dTotal = dTotal - dOneCoinsAmount;
-		if(dOneCoinsAmount > 0.0) {
-			CoinsResponse coinsResponse = new CoinsResponse();
-			coinsResponse.setCoinQuantity(iMaxOneQuantity);
-			coinsResponse.setCoinDenomination(exchangeMachineValues.oneCentAmout);
-			coinsResponse.setCoinAmount(dOneCoinsAmount);
-			lstCoinsResponse.add(coinsResponse);
-			exchangeMachineValues.oneCentQuantity = exchangeMachineValues.oneCentQuantity - iMaxOneQuantity;  
-		}
-
-		
-		System.out.println("One Cents Calculations --------------");
-		System.out.println("One Cents Amount : " + dOneCoinsAmount);
-		System.out.println("Amount after substraction : " + dTotal);
-		System.out.println("Remaining coins in machine : " + exchangeMachineValues.oneCentQuantity );
 		
 		
 		return lstCoinsResponse;
 	}
+	
 
-	
-	
-	private void getCoinsCalculation(Integer coinsCurrentQuantity, Integer coinsMaxQuantity, Double coinsDonomination, Double dTotal, List<CoinsResponse> lstCoinsResponse, CoinExchangeWrapper coinExchangeWrapper ) {
+	private ExchangeMachineException getExchangeMachineException(String errorMessage, Exception e) {
 		
-		Integer iMaxCoinsQuantity = 0;
-		Double dCoinsAmount = 0.0;
+		ExchangeMachineException betaProgramException = new ExchangeMachineException();
+		betaProgramException.setErrorMessage(errorMessage + e.getMessage());
+		if (e.getStackTrace()!=null)
+			betaProgramException.setStackTrace(e.getStackTrace());
+			betaProgramException.setClassName(e.getClass().getName());
+			betaProgramException.setErrorMessage(errorMessage);
+			betaProgramException.setLogLevel(Level.WARNING);
+	return betaProgramException;
 		
-		
-		if(coinsCurrentQuantity > coinsMaxQuantity ) {
-			iMaxCoinsQuantity = coinsMaxQuantity;
-		}else {
-			iMaxCoinsQuantity = coinsCurrentQuantity;
-		}
-		
-		dCoinsAmount = coinsDonomination * iMaxCoinsQuantity;
-		dTotal = dTotal - dCoinsAmount;
-		if(dCoinsAmount > 0.0) {
-			CoinsResponse quaterResponse = new CoinsResponse();
-			quaterResponse.setCoinQuantity(iMaxCoinsQuantity);
-			quaterResponse.setCoinDenomination(coinsDonomination);
-			quaterResponse.setCoinAmount(dCoinsAmount);
-			lstCoinsResponse.add(quaterResponse);
-			coinsCurrentQuantity = coinsCurrentQuantity - iMaxCoinsQuantity;
-			coinExchangeWrapper.setCurrentCoinQuantity(coinsCurrentQuantity);
-		
-		}
 		
 	}
+
+
+
 }
