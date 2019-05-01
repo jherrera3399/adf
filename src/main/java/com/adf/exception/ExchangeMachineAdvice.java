@@ -6,7 +6,10 @@ import java.util.logging.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import com.adf.model.ExchangeMachineMessage;
@@ -44,6 +47,24 @@ public class ExchangeMachineAdvice {
 		
 		return new ResponseEntity<ExchangeMachineMessage>(exchangeMessage, HttpStatus.BAD_REQUEST);
 	}
+	
+	
+	
+	@ExceptionHandler(HttpMessageNotReadableException.class)
+	@ResponseStatus(value = HttpStatus.BAD_REQUEST)
+	@ResponseBody
+	public ResponseEntity<ExchangeMachineMessage> badRequest(Exception exception) {
+		ExchangeMachineMessage exchangeMessage = new ExchangeMachineMessage();
+		exchangeMessage.setStatus(ERROR_PROCESSING_REQUEST);
+		exchangeMessage.setStatusCode(HttpStatus.BAD_REQUEST.value());
+		exchangeMessage.setMessage("There is an error with your request, please verify and try again!");
+		
+		logger.warning("There is an error with a request");
+
+		return new ResponseEntity<ExchangeMachineMessage>(exchangeMessage, HttpStatus.BAD_REQUEST);
+
+	}
+
 
 	
 }

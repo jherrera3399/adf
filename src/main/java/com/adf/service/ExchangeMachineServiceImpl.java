@@ -131,14 +131,14 @@ public class ExchangeMachineServiceImpl implements ExchangeMachineService {
 		
 		ExchangeMachineException betaProgramException = new ExchangeMachineException();
 		betaProgramException.setErrorMessage(errorMessage + e.getMessage());
-		if (e.getStackTrace()!=null)
+		if (e.getStackTrace()!=null) {
 			betaProgramException.setStackTrace(e.getStackTrace());
 			betaProgramException.setClassName(e.getClass().getName());
 			betaProgramException.setErrorMessage(errorMessage);
 			betaProgramException.setLogLevel(Level.WARNING);
-	return betaProgramException;
+		}
 		
-		
+		return betaProgramException;
 	}
 
 
